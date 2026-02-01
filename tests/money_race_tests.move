@@ -3,8 +3,8 @@ module money_race::money_race_tests {
     use money_race::money_race::{Self, AdminCap, Room, Vault, PlayerPosition};
     use sui::test_scenario::{Self as ts, Scenario};
     use sui::coin::{Self, Coin};
-    use sui::sui::SUI;
     use sui::clock::{Self};
+    use mock_usdc::usdc::USDC;
 
     /* =========================
         TEST CONSTANTS
@@ -48,8 +48,8 @@ module money_race::money_race_tests {
         };
     }
 
-    fun mint_coin(amount: u64, ctx: &mut TxContext): Coin<SUI> {
-        coin::mint_for_testing<SUI>(amount, ctx)
+    fun mint_coin(amount: u64, ctx: &mut TxContext): Coin<USDC> {
+        coin::mint_for_testing<USDC>(amount, ctx)
     }
 
     /* =========================

@@ -2,11 +2,11 @@ module money_race::money_race {
 
     use sui::coin::{Self, Coin};
     use sui::balance::{Self, Balance};
-    use sui::sui::SUI;
     use sui::object::UID;
     use sui::tx_context::TxContext;
     use sui::transfer;
     use sui::clock::Clock;
+    use mock_usdc::usdc::USDC;
 
     /* =========================
         CONSTANTS
@@ -48,8 +48,8 @@ module money_race::money_race {
 
     public struct Vault has key {
         id: UID,
-        principal: Balance<SUI>,
-        reward: Balance<SUI>
+        principal: Balance<USDC>,
+        reward: Balance<USDC>
     }
 
     public struct PlayerPosition has key, store {
@@ -100,8 +100,8 @@ module money_race::money_race {
 
         let vault = Vault {
             id: sui::object::new(ctx),
-            principal: balance::zero<SUI>(),
-            reward: balance::zero<SUI>()
+            principal: balance::zero<USDC>(),
+            reward: balance::zero<USDC>()
         };
 
         (room, vault)
@@ -148,7 +148,7 @@ module money_race::money_race {
         room: &Room,
         vault: &mut Vault,
         clock: &Clock,
-        coin: Coin<SUI>,
+        coin: Coin<USDC>,
         ctx: &mut TxContext
     ): PlayerPosition {
 
@@ -179,7 +179,7 @@ module money_race::money_race {
         vault: &mut Vault,
         player: &mut PlayerPosition,
         clock: &Clock,
-        coin: Coin<SUI>
+        coin: Coin<USDC>
     ) {
         assert!(room.status == STATUS_ACTIVE, E_INVALID_STATUS);
 
@@ -218,7 +218,7 @@ module money_race::money_race {
     public fun fund_reward_pool(
         _admin: &AdminCap,
         vault: &mut Vault,
-        coin: Coin<SUI>
+        coin: Coin<USDC>
     ) {
         let bal = coin::into_balance(coin);
         balance::join(&mut vault.reward, bal);
