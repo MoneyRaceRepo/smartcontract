@@ -725,6 +725,304 @@ module money_race::money_race_tests {
     }
 
     /* =========================
+        TEST: CLAIM PRINCIPAL
+    ==========================*/
+
+    #[test]
+    fun test_claim_principal_success() {
+        let mut scenario = setup_test();
+        create_and_share_room(&mut scenario);
+
+        // Start room
+        ts::next_tx(&mut scenario, ADMIN);
+        {
+            let admin_cap = ts::take_from_sender<AdminCap>(&scenario);
+            let mut room = ts::take_shared<Room>(&scenario);
+            money_race::start_room(&admin_cap, &mut room);
+            ts::return_to_sender(&scenario, admin_cap);
+            ts::return_shared(room);
+        };
+
+        // Player joins (1 deposit)
+        ts::next_tx(&mut scenario, PLAYER1);
+        {
+            let room = ts::take_shared<Room>(&scenario);
+            let mut vault = ts::take_shared<Vault>(&scenario);
+            let mut clock = clock::create_for_testing(ts::ctx(&mut scenario));
+            clock::set_for_testing(&mut clock, START_TIME_MS);
+
+            let coin = mint_coin(DEPOSIT_AMOUNT, ts::ctx(&mut scenario));
+            let player_pos = money_race::join_room(&room, &mut vault, &clock, coin, ts::ctx(&mut scenario));
+            transfer::public_transfer(player_pos, PLAYER1);
+
+            clock::destroy_for_testing(clock);
+            ts::return_shared(room);
+            ts::return_shared(vault);
+        };
+
+        // Player makes 2 more deposits (total 3 deposits)
+        ts::next_tx(&mut scenario, PLAYER1);
+        {
+            let room = ts::take_shared<Room>(&scenario);
+            let mut vault = ts::take_shared<Vault>(&scenario);
+            let mut player_pos = ts::take_from_sender<PlayerPosition>(&scenario);
+            let mut clock = clock::create_for_testing(ts::ctx(&mut scenario));
+            clock::set_for_testing(&mut clock, START_TIME_MS + PERIOD_LENGTH_MS);
+
+            let coin = mint_coin(DEPOSIT_AMOUNT, ts::ctx(&mut scenario));
+            money_race::deposit(&room, &mut vault, &mut player_pos, &clock, coin);
+
+            clock::destroy_for_testing(clock);
+            ts::return_to_sender(&scenario, player_pos);
+            ts::return_shared(room);
+            ts::return_shared(vault);
+        };
+
+        ts::next_tx(&mut scenario, PLAYER1);
+        {
+            let room = ts::take_shared<Room>(&scenario);
+            let mut vault = ts::take_shared<Vault>(&scenario);
+            let mut player_pos = ts::take_from_sender<PlayerPosition>(&scenario);
+            let mut clock = clock::create_for_testing(ts::ctx(&mut scenario));
+            clock::set_for_testing(&mut clock, START_TIME_MS + PERIOD_LENGTH_MS * 2);
+
+            let coin = mint_coin(DEPOSIT_AMOUNT, ts::ctx(&mut scenario));
+            money_race::deposit(&room, &mut vault, &mut player_pos, &clock, coin);
+
+            clock::destroy_for_testing(clock);
+            ts::return_to_sender(&scenario, player_pos);
+            ts::return_shared(room);
+            ts::return_shared(vault);
+        };
+
+        // Finalize room
+        ts::next_tx(&mut scenario, ADMIN);
+        {
+            let admin_cap = ts::take_from_sender<AdminCap>(&scenario);
+            let mut room = ts::take_shared<Room>(&scenario);
+            money_race::finalize_room(&admin_cap, &mut room, 3);
+            ts::return_to_sender(&scenario, admin_cap);
+            ts::return_shared(room);
+        };
+
+        // Claim principal (should get 3 * DEPOSIT_AMOUNT)
+        ts::next_tx(&mut scenario, PLAYER1);
+        {
+            let room = ts::take_shared<Room>(&scenario);
+            let mut vault = ts::take_shared<Vault>(&scenario);
+            let mut player_pos = ts::take_from_sender<PlayerPosition>(&scenario);
+
+            money_race::claim_principal(&room, &mut vault, &mut player_pos, ts::ctx(&mut scenario));
+
+            ts::return_to_sender(&scenario, player_pos);
+            ts::return_shared(room);
+            ts::return_shared(vault);
+        };
+
+        ts::end(scenario);
+    }
+
+    #[test]
+    #[expected_failure(abort_code = 1)]
+    fun test_claim_principal_room_not_finished() {
+        let mut scenario = setup_test();
+        create_and_share_room(&mut scenario);
+
+        // Start room
+        ts::next_tx(&mut scenario, ADMIN);
+        {
+            let admin_cap = ts::take_from_sender<AdminCap>(&scenario);
+            let mut room = ts::take_shared<Room>(&scenario);
+            money_race::start_room(&admin_cap, &mut room);
+            ts::return_to_sender(&scenario, admin_cap);
+            ts::return_shared(room);
+        };
+
+        // Player joins
+        ts::next_tx(&mut scenario, PLAYER1);
+        {
+            let room = ts::take_shared<Room>(&scenario);
+            let mut vault = ts::take_shared<Vault>(&scenario);
+            let mut clock = clock::create_for_testing(ts::ctx(&mut scenario));
+            clock::set_for_testing(&mut clock, START_TIME_MS);
+
+            let coin = mint_coin(DEPOSIT_AMOUNT, ts::ctx(&mut scenario));
+            let player_pos = money_race::join_room(&room, &mut vault, &clock, coin, ts::ctx(&mut scenario));
+            transfer::public_transfer(player_pos, PLAYER1);
+
+            clock::destroy_for_testing(clock);
+            ts::return_shared(room);
+            ts::return_shared(vault);
+        };
+
+        // Try to claim principal without finalizing (should fail)
+        ts::next_tx(&mut scenario, PLAYER1);
+        {
+            let room = ts::take_shared<Room>(&scenario);
+            let mut vault = ts::take_shared<Vault>(&scenario);
+            let mut player_pos = ts::take_from_sender<PlayerPosition>(&scenario);
+
+            money_race::claim_principal(&room, &mut vault, &mut player_pos, ts::ctx(&mut scenario));
+
+            ts::return_to_sender(&scenario, player_pos);
+            ts::return_shared(room);
+            ts::return_shared(vault);
+        };
+
+        ts::end(scenario);
+    }
+
+    #[test]
+    #[expected_failure(abort_code = 6)]
+    fun test_claim_principal_twice() {
+        let mut scenario = setup_test();
+        create_and_share_room(&mut scenario);
+
+        // Start room
+        ts::next_tx(&mut scenario, ADMIN);
+        {
+            let admin_cap = ts::take_from_sender<AdminCap>(&scenario);
+            let mut room = ts::take_shared<Room>(&scenario);
+            money_race::start_room(&admin_cap, &mut room);
+            ts::return_to_sender(&scenario, admin_cap);
+            ts::return_shared(room);
+        };
+
+        // Player joins
+        ts::next_tx(&mut scenario, PLAYER1);
+        {
+            let room = ts::take_shared<Room>(&scenario);
+            let mut vault = ts::take_shared<Vault>(&scenario);
+            let mut clock = clock::create_for_testing(ts::ctx(&mut scenario));
+            clock::set_for_testing(&mut clock, START_TIME_MS);
+
+            let coin = mint_coin(DEPOSIT_AMOUNT, ts::ctx(&mut scenario));
+            let player_pos = money_race::join_room(&room, &mut vault, &clock, coin, ts::ctx(&mut scenario));
+            transfer::public_transfer(player_pos, PLAYER1);
+
+            clock::destroy_for_testing(clock);
+            ts::return_shared(room);
+            ts::return_shared(vault);
+        };
+
+        // Finalize room
+        ts::next_tx(&mut scenario, ADMIN);
+        {
+            let admin_cap = ts::take_from_sender<AdminCap>(&scenario);
+            let mut room = ts::take_shared<Room>(&scenario);
+            money_race::finalize_room(&admin_cap, &mut room, 1);
+            ts::return_to_sender(&scenario, admin_cap);
+            ts::return_shared(room);
+        };
+
+        // Claim principal first time
+        ts::next_tx(&mut scenario, PLAYER1);
+        {
+            let room = ts::take_shared<Room>(&scenario);
+            let mut vault = ts::take_shared<Vault>(&scenario);
+            let mut player_pos = ts::take_from_sender<PlayerPosition>(&scenario);
+            money_race::claim_principal(&room, &mut vault, &mut player_pos, ts::ctx(&mut scenario));
+            ts::return_to_sender(&scenario, player_pos);
+            ts::return_shared(room);
+            ts::return_shared(vault);
+        };
+
+        // Try to claim again (should fail)
+        ts::next_tx(&mut scenario, PLAYER1);
+        {
+            let room = ts::take_shared<Room>(&scenario);
+            let mut vault = ts::take_shared<Vault>(&scenario);
+            let mut player_pos = ts::take_from_sender<PlayerPosition>(&scenario);
+            money_race::claim_principal(&room, &mut vault, &mut player_pos, ts::ctx(&mut scenario));
+            ts::return_to_sender(&scenario, player_pos);
+            ts::return_shared(room);
+            ts::return_shared(vault);
+        };
+
+        ts::end(scenario);
+    }
+
+    #[test]
+    fun test_claim_principal_and_reward() {
+        let mut scenario = setup_test();
+        create_and_share_room(&mut scenario);
+
+        // Start room
+        ts::next_tx(&mut scenario, ADMIN);
+        {
+            let admin_cap = ts::take_from_sender<AdminCap>(&scenario);
+            let mut room = ts::take_shared<Room>(&scenario);
+            money_race::start_room(&admin_cap, &mut room);
+            ts::return_to_sender(&scenario, admin_cap);
+            ts::return_shared(room);
+        };
+
+        // Player joins
+        ts::next_tx(&mut scenario, PLAYER1);
+        {
+            let room = ts::take_shared<Room>(&scenario);
+            let mut vault = ts::take_shared<Vault>(&scenario);
+            let mut clock = clock::create_for_testing(ts::ctx(&mut scenario));
+            clock::set_for_testing(&mut clock, START_TIME_MS);
+
+            let coin = mint_coin(DEPOSIT_AMOUNT, ts::ctx(&mut scenario));
+            let player_pos = money_race::join_room(&room, &mut vault, &clock, coin, ts::ctx(&mut scenario));
+            transfer::public_transfer(player_pos, PLAYER1);
+
+            clock::destroy_for_testing(clock);
+            ts::return_shared(room);
+            ts::return_shared(vault);
+        };
+
+        // Fund reward pool
+        ts::next_tx(&mut scenario, ADMIN);
+        {
+            let admin_cap = ts::take_from_sender<AdminCap>(&scenario);
+            let mut vault = ts::take_shared<Vault>(&scenario);
+            let coin = mint_coin(5000, ts::ctx(&mut scenario));
+            money_race::fund_reward_pool(&admin_cap, &mut vault, coin);
+            ts::return_to_sender(&scenario, admin_cap);
+            ts::return_shared(vault);
+        };
+
+        // Finalize room
+        ts::next_tx(&mut scenario, ADMIN);
+        {
+            let admin_cap = ts::take_from_sender<AdminCap>(&scenario);
+            let mut room = ts::take_shared<Room>(&scenario);
+            money_race::finalize_room(&admin_cap, &mut room, 1);
+            ts::return_to_sender(&scenario, admin_cap);
+            ts::return_shared(room);
+        };
+
+        // Claim principal
+        ts::next_tx(&mut scenario, PLAYER1);
+        {
+            let room = ts::take_shared<Room>(&scenario);
+            let mut vault = ts::take_shared<Vault>(&scenario);
+            let mut player_pos = ts::take_from_sender<PlayerPosition>(&scenario);
+            money_race::claim_principal(&room, &mut vault, &mut player_pos, ts::ctx(&mut scenario));
+            ts::return_to_sender(&scenario, player_pos);
+            ts::return_shared(room);
+            ts::return_shared(vault);
+        };
+
+        // Claim reward
+        ts::next_tx(&mut scenario, PLAYER1);
+        {
+            let room = ts::take_shared<Room>(&scenario);
+            let mut vault = ts::take_shared<Vault>(&scenario);
+            let mut player_pos = ts::take_from_sender<PlayerPosition>(&scenario);
+            money_race::claim_reward(&room, &mut vault, &mut player_pos, ts::ctx(&mut scenario));
+            ts::return_to_sender(&scenario, player_pos);
+            ts::return_shared(room);
+            ts::return_shared(vault);
+        };
+
+        ts::end(scenario);
+    }
+
+    /* =========================
         TEST: COMPLETE GAME FLOW
     ==========================*/
 
@@ -833,7 +1131,7 @@ module money_race::money_race_tests {
             ts::return_shared(room);
         };
 
-        // Both players claim rewards
+        // Player 1 claims reward (75% of 10000 = 7500)
         ts::next_tx(&mut scenario, PLAYER1);
         {
             let room = ts::take_shared<Room>(&scenario);
@@ -845,12 +1143,37 @@ module money_race::money_race_tests {
             ts::return_shared(vault);
         };
 
+        // Player 2 claims reward (25% of 10000 = 2500)
         ts::next_tx(&mut scenario, PLAYER2);
         {
             let room = ts::take_shared<Room>(&scenario);
             let mut vault = ts::take_shared<Vault>(&scenario);
             let mut player_pos = ts::take_from_sender<PlayerPosition>(&scenario);
             money_race::claim_reward(&room, &mut vault, &mut player_pos, ts::ctx(&mut scenario));
+            ts::return_to_sender(&scenario, player_pos);
+            ts::return_shared(room);
+            ts::return_shared(vault);
+        };
+
+        // Player 1 claims principal (3 deposits * 1000 = 3000)
+        ts::next_tx(&mut scenario, PLAYER1);
+        {
+            let room = ts::take_shared<Room>(&scenario);
+            let mut vault = ts::take_shared<Vault>(&scenario);
+            let mut player_pos = ts::take_from_sender<PlayerPosition>(&scenario);
+            money_race::claim_principal(&room, &mut vault, &mut player_pos, ts::ctx(&mut scenario));
+            ts::return_to_sender(&scenario, player_pos);
+            ts::return_shared(room);
+            ts::return_shared(vault);
+        };
+
+        // Player 2 claims principal (1 deposit * 1000 = 1000)
+        ts::next_tx(&mut scenario, PLAYER2);
+        {
+            let room = ts::take_shared<Room>(&scenario);
+            let mut vault = ts::take_shared<Vault>(&scenario);
+            let mut player_pos = ts::take_from_sender<PlayerPosition>(&scenario);
+            money_race::claim_principal(&room, &mut vault, &mut player_pos, ts::ctx(&mut scenario));
             ts::return_to_sender(&scenario, player_pos);
             ts::return_shared(room);
             ts::return_shared(vault);
