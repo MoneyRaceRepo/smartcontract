@@ -29,7 +29,6 @@ module money_race::money_race {
         STRUCTS
     ==========================*/
 
-    // 🔧 WAJIB key + store (karena public_transfer)
     public struct AdminCap has key, store {
         id: UID
     }
@@ -58,14 +57,14 @@ module money_race::money_race {
         owner: address,
         deposited_count: u64,
         last_period: u64,
-        reward_claimed: bool
+        reward_claimed: bool,
+        principal_claimed: bool // 👈 BARU
     }
 
     /* =========================
-        INIT (SUI STYLE)
+        INIT
     ==========================*/
 
-    // init HARUS internal & return ()
     fun init(ctx: &mut TxContext) {
         let cap = AdminCap { id: sui::object::new(ctx) };
         transfer::public_transfer(cap, sui::tx_context::sender(ctx));
@@ -110,7 +109,7 @@ module money_race::money_race {
     }
 
     /* =========================
-        SHARE OBJECTS (TEST HELPER)
+        TEST HELPERS
     ==========================*/
 
     #[test_only]
@@ -143,7 +142,7 @@ module money_race::money_race {
     }
 
     /* =========================
-        JOIN (ONLY PERIOD 0)
+        JOIN ROOM
     ==========================*/
 
     public fun join_room(
@@ -158,7 +157,6 @@ module money_race::money_race {
 
         let period = current_period(room, clock);
         assert!(period == 0, E_JOIN_CLOSED);
-
         assert!(coin::value(&coin) == room.deposit_amount, E_AMOUNT_INVALID);
 
         let bal = coin::into_balance(coin);
@@ -169,7 +167,8 @@ module money_race::money_race {
             owner: sui::tx_context::sender(ctx),
             deposited_count: 1,
             last_period: 0,
-            reward_claimed: false
+            reward_claimed: false,
+            principal_claimed: false
         }
     }
 
@@ -199,7 +198,7 @@ module money_race::money_race {
     }
 
     /* =========================
-        FINALIZE
+        FINALIZE ROOM
     ==========================*/
 
     public fun finalize_room(
@@ -248,6 +247,28 @@ module money_race::money_race {
         let coin = coin::from_balance(bal, ctx);
 
         player.reward_claimed = true;
+        transfer::public_transfer(coin, player.owner);
+    }
+
+    /* =========================
+        CLAIM PRINCIPAL (BARU)
+    ==========================*/
+
+    public fun claim_principal(
+        room: &Room,
+        vault: &mut Vault,
+        player: &mut PlayerPosition,
+        ctx: &mut TxContext
+    ) {
+        assert!(room.status == STATUS_FINISHED, E_INVALID_STATUS);
+        assert!(!player.principal_claimed, E_ALREADY_CLAIMED);
+
+        let amount = player.deposited_count * room.deposit_amount;
+
+        let bal = balance::split(&mut vault.principal, amount);
+        let coin = coin::from_balance(bal, ctx);
+
+        player.principal_claimed = true;
         transfer::public_transfer(coin, player.owner);
     }
 }
