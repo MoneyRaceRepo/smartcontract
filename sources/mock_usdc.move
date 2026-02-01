@@ -6,106 +6,129 @@ module mock_usdc::usdc {
     use sui::transfer;
     use sui::table::{Self, Table};
     use sui::clock::{Self, Clock};
+    use sui::event;
+    use std::option;
 
-    /// Error codes
+    /* =========================
+        ERRORS & CONSTANTS
+    ==========================*/
+
     const E_COOLDOWN_NOT_PASSED: u64 = 1;
     const E_AMOUNT_TOO_LARGE: u64 = 2;
 
-    /// Cooldown period: 24 jam = 24 * 60 * 60 * 1000 ms
-    const COOLDOWN_MS: u64 = 86_400_000;
+    const COOLDOWN_MS: u64 = 86_400_000; // 24 jam
+    const MAX_MINT_AMOUNT: u64 = 1_000_000_000; // 1000 USDC (6 decimals)
 
-    /// Maximum mint amount per request (1000 USDC)
-    const MAX_MINT_AMOUNT: u64 = 1_000_000_000; // 1000 * 10^6 (6 decimals)
+    /* =========================
+        EVENTS
+    ==========================*/
 
-    /// Marker type untuk USDC Mock
+    /// Event emitted setiap kali mint berhasil
+    public struct MintEvent has copy, drop {
+        minter: address,
+        amount: u64,
+        timestamp_ms: u64,
+    }
+
+    /* =========================
+        TYPES
+    ==========================*/
+
+    /// Marker type
     public struct USDC has drop {}
 
-    /// Shared object untuk mint USDC dengan cooldown
+    /// Shared faucet
     public struct USDCFaucet has key {
         id: UID,
         treasury: coin::TreasuryCap<USDC>,
-        /// Track last mint time per address
         last_mint: Table<address, u64>,
     }
 
-    /// INIT - Dipanggil saat publish
+    /* =========================
+        INIT
+    ==========================*/
+
     fun init(witness: USDC, ctx: &mut TxContext) {
-        let (treasury_cap, metadata) = coin::create_currency<USDC>(
+        let (treasury, metadata) = coin::create_currency<USDC>(
             witness,
-            6,                              // decimals (USDC = 6)
-            b"USDC",                        // symbol
-            b"Mock USD Coin",               // name
-            b"Mock USDC for testing",       // description
-            option::none(),                 // icon URL
+            6,
+            b"USDC",
+            b"Mock USD Coin",
+            b"Mock USDC for testing",
+            option::none(),
             ctx
         );
 
-        // Buat faucet sebagai shared object
         let faucet = USDCFaucet {
             id: object::new(ctx),
-            treasury: treasury_cap,
+            treasury,
             last_mint: table::new(ctx),
         };
 
-        // Share faucet agar semua orang bisa akses
         transfer::share_object(faucet);
-
-        // Freeze metadata (tidak perlu diubah)
         transfer::public_freeze_object(metadata);
     }
 
-    /// MINT USDC dengan cooldown 24 jam
-    /// Siapa saja bisa mint, max 1000 USDC per request
-    public fun mint(
+    #[test_only]
+    public fun init_for_testing(ctx: &mut TxContext) {
+        let witness = USDC {};
+        init(witness, ctx);
+    }
+
+    /* =========================
+        MINT (ENTRY)
+    ==========================*/
+
+    public entry fun mint(
         faucet: &mut USDCFaucet,
         amount: u64,
         clock: &Clock,
         ctx: &mut TxContext
-    ): coin::Coin<USDC> {
-        // Check amount limit
+    ) {
         assert!(amount <= MAX_MINT_AMOUNT, E_AMOUNT_TOO_LARGE);
 
         let sender = tx_context::sender(ctx);
-        let current_time = clock::timestamp_ms(clock);
+        let now = clock::timestamp_ms(clock);
 
-        // Check cooldown
         if (table::contains(&faucet.last_mint, sender)) {
-            let last_time = *table::borrow(&faucet.last_mint, sender);
-            assert!(current_time >= last_time + COOLDOWN_MS, E_COOLDOWN_NOT_PASSED);
-            // Update last mint time
-            *table::borrow_mut(&mut faucet.last_mint, sender) = current_time;
+            let last = *table::borrow(&faucet.last_mint, sender);
+            assert!(now >= last + COOLDOWN_MS, E_COOLDOWN_NOT_PASSED);
+            *table::borrow_mut(&mut faucet.last_mint, sender) = now;
         } else {
-            // First time minting
-            table::add(&mut faucet.last_mint, sender, current_time);
+            table::add(&mut faucet.last_mint, sender, now);
         };
 
-        // Mint coin
-        coin::mint(&mut faucet.treasury, amount, ctx)
+        let coin = coin::mint(&mut faucet.treasury, amount, ctx);
+        transfer::public_transfer(coin, sender);
+
+        /* ===== EMIT EVENT ===== */
+        event::emit(MintEvent {
+            minter: sender,
+            amount,
+            timestamp_ms: now,
+        });
     }
 
-    /// Check berapa lama lagi bisa mint (dalam ms)
-    /// Return 0 jika sudah bisa mint
+    /* =========================
+        VIEW HELPERS (INTERNAL)
+    ==========================*/
+
     public fun time_until_next_mint(
         faucet: &USDCFaucet,
         user: address,
         clock: &Clock,
     ): u64 {
         if (!table::contains(&faucet.last_mint, user)) {
-            return 0 // Belum pernah mint, bisa mint sekarang
+            return 0
         };
 
-        let last_time = *table::borrow(&faucet.last_mint, user);
-        let current_time = clock::timestamp_ms(clock);
-        let next_available = last_time + COOLDOWN_MS;
+        let last = *table::borrow(&faucet.last_mint, user);
+        let now = clock::timestamp_ms(clock);
+        let next = last + COOLDOWN_MS;
 
-        if (current_time >= next_available) {
-            0
-        } else {
-            next_available - current_time
-        }
+        if (now >= next) 0 else next - now
     }
 
-    /// Check apakah user bisa mint sekarang
     public fun can_mint(
         faucet: &USDCFaucet,
         user: address,

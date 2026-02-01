@@ -34,7 +34,7 @@ module money_race::money_race_tests {
     fun create_and_share_room(scenario: &mut Scenario) {
         ts::next_tx(scenario, ADMIN);
         {
-            let (room, vault) = money_race::create_room(
+            let (room, vault) = money_race::create_room_for_testing(
                 TOTAL_PERIODS,
                 DEPOSIT_AMOUNT,
                 1, // strategy_id
@@ -62,7 +62,7 @@ module money_race::money_race_tests {
 
         ts::next_tx(&mut scenario, ADMIN);
         {
-            let (room, vault) = money_race::create_room(
+            let (room, vault) = money_race::create_room_for_testing(
                 TOTAL_PERIODS,
                 DEPOSIT_AMOUNT,
                 1,
@@ -156,14 +156,14 @@ module money_race::money_race_tests {
         // Player joins
         ts::next_tx(&mut scenario, PLAYER1);
         {
-            let room = ts::take_shared<Room>(&scenario);
+            let mut room = ts::take_shared<Room>(&scenario);
             let mut vault = ts::take_shared<Vault>(&scenario);
             let mut clock = clock::create_for_testing(ts::ctx(&mut scenario));
             clock::set_for_testing(&mut clock, START_TIME_MS);
 
             let coin = mint_coin(DEPOSIT_AMOUNT, ts::ctx(&mut scenario));
-            let player_pos = money_race::join_room(
-                &room,
+            let player_pos = money_race::join_room_for_testing(
+                &mut room,
                 &mut vault,
                 &clock,
                 coin,
@@ -189,14 +189,14 @@ module money_race::money_race_tests {
         // Try to join without starting (should fail)
         ts::next_tx(&mut scenario, PLAYER1);
         {
-            let room = ts::take_shared<Room>(&scenario);
+            let mut room = ts::take_shared<Room>(&scenario);
             let mut vault = ts::take_shared<Vault>(&scenario);
             let mut clock = clock::create_for_testing(ts::ctx(&mut scenario));
             clock::set_for_testing(&mut clock, START_TIME_MS);
 
             let coin = mint_coin(DEPOSIT_AMOUNT, ts::ctx(&mut scenario));
-            let player_pos = money_race::join_room(
-                &room,
+            let player_pos = money_race::join_room_for_testing(
+                &mut room,
                 &mut vault,
                 &clock,
                 coin,
@@ -232,14 +232,14 @@ module money_race::money_race_tests {
         // Try to join in period 1 (should fail)
         ts::next_tx(&mut scenario, PLAYER1);
         {
-            let room = ts::take_shared<Room>(&scenario);
+            let mut room = ts::take_shared<Room>(&scenario);
             let mut vault = ts::take_shared<Vault>(&scenario);
             let mut clock = clock::create_for_testing(ts::ctx(&mut scenario));
             clock::set_for_testing(&mut clock, START_TIME_MS + PERIOD_LENGTH_MS);
 
             let coin = mint_coin(DEPOSIT_AMOUNT, ts::ctx(&mut scenario));
-            let player_pos = money_race::join_room(
-                &room,
+            let player_pos = money_race::join_room_for_testing(
+                &mut room,
                 &mut vault,
                 &clock,
                 coin,
@@ -275,14 +275,14 @@ module money_race::money_race_tests {
         // Try to join with wrong amount (should fail)
         ts::next_tx(&mut scenario, PLAYER1);
         {
-            let room = ts::take_shared<Room>(&scenario);
+            let mut room = ts::take_shared<Room>(&scenario);
             let mut vault = ts::take_shared<Vault>(&scenario);
             let mut clock = clock::create_for_testing(ts::ctx(&mut scenario));
             clock::set_for_testing(&mut clock, START_TIME_MS);
 
             let coin = mint_coin(DEPOSIT_AMOUNT + 100, ts::ctx(&mut scenario));
-            let player_pos = money_race::join_room(
-                &room,
+            let player_pos = money_race::join_room_for_testing(
+                &mut room,
                 &mut vault,
                 &clock,
                 coin,
@@ -321,13 +321,13 @@ module money_race::money_race_tests {
         // Player joins
         ts::next_tx(&mut scenario, PLAYER1);
         {
-            let room = ts::take_shared<Room>(&scenario);
+            let mut room = ts::take_shared<Room>(&scenario);
             let mut vault = ts::take_shared<Vault>(&scenario);
             let mut clock = clock::create_for_testing(ts::ctx(&mut scenario));
             clock::set_for_testing(&mut clock, START_TIME_MS);
 
             let coin = mint_coin(DEPOSIT_AMOUNT, ts::ctx(&mut scenario));
-            let player_pos = money_race::join_room(&room, &mut vault, &clock, coin, ts::ctx(&mut scenario));
+            let player_pos = money_race::join_room_for_testing(&mut room, &mut vault, &clock, coin, ts::ctx(&mut scenario));
             transfer::public_transfer(player_pos, PLAYER1);
 
             clock::destroy_for_testing(clock);
@@ -338,14 +338,14 @@ module money_race::money_race_tests {
         // Player deposits in period 1
         ts::next_tx(&mut scenario, PLAYER1);
         {
-            let room = ts::take_shared<Room>(&scenario);
+            let mut room = ts::take_shared<Room>(&scenario);
             let mut vault = ts::take_shared<Vault>(&scenario);
             let mut player_pos = ts::take_from_sender<PlayerPosition>(&scenario);
             let mut clock = clock::create_for_testing(ts::ctx(&mut scenario));
             clock::set_for_testing(&mut clock, START_TIME_MS + PERIOD_LENGTH_MS);
 
             let coin = mint_coin(DEPOSIT_AMOUNT, ts::ctx(&mut scenario));
-            money_race::deposit(&room, &mut vault, &mut player_pos, &clock, coin);
+            money_race::deposit_for_testing(&mut room, &mut vault, &mut player_pos, &clock, coin);
 
             clock::destroy_for_testing(clock);
             ts::return_to_sender(&scenario, player_pos);
@@ -375,13 +375,13 @@ module money_race::money_race_tests {
         // Player joins in period 0
         ts::next_tx(&mut scenario, PLAYER1);
         {
-            let room = ts::take_shared<Room>(&scenario);
+            let mut room = ts::take_shared<Room>(&scenario);
             let mut vault = ts::take_shared<Vault>(&scenario);
             let mut clock = clock::create_for_testing(ts::ctx(&mut scenario));
             clock::set_for_testing(&mut clock, START_TIME_MS);
 
             let coin = mint_coin(DEPOSIT_AMOUNT, ts::ctx(&mut scenario));
-            let player_pos = money_race::join_room(&room, &mut vault, &clock, coin, ts::ctx(&mut scenario));
+            let player_pos = money_race::join_room_for_testing(&mut room, &mut vault, &clock, coin, ts::ctx(&mut scenario));
             transfer::public_transfer(player_pos, PLAYER1);
 
             clock::destroy_for_testing(clock);
@@ -392,14 +392,14 @@ module money_race::money_race_tests {
         // Player deposits in period 1
         ts::next_tx(&mut scenario, PLAYER1);
         {
-            let room = ts::take_shared<Room>(&scenario);
+            let mut room = ts::take_shared<Room>(&scenario);
             let mut vault = ts::take_shared<Vault>(&scenario);
             let mut player_pos = ts::take_from_sender<PlayerPosition>(&scenario);
             let mut clock = clock::create_for_testing(ts::ctx(&mut scenario));
             clock::set_for_testing(&mut clock, START_TIME_MS + PERIOD_LENGTH_MS);
 
             let coin = mint_coin(DEPOSIT_AMOUNT, ts::ctx(&mut scenario));
-            money_race::deposit(&room, &mut vault, &mut player_pos, &clock, coin);
+            money_race::deposit_for_testing(&mut room, &mut vault, &mut player_pos, &clock, coin);
 
             clock::destroy_for_testing(clock);
             ts::return_to_sender(&scenario, player_pos);
@@ -410,14 +410,14 @@ module money_race::money_race_tests {
         // Try to deposit in same period again (should fail)
         ts::next_tx(&mut scenario, PLAYER1);
         {
-            let room = ts::take_shared<Room>(&scenario);
+            let mut room = ts::take_shared<Room>(&scenario);
             let mut vault = ts::take_shared<Vault>(&scenario);
             let mut player_pos = ts::take_from_sender<PlayerPosition>(&scenario);
             let mut clock = clock::create_for_testing(ts::ctx(&mut scenario));
             clock::set_for_testing(&mut clock, START_TIME_MS + PERIOD_LENGTH_MS + 1000);
 
             let coin = mint_coin(DEPOSIT_AMOUNT, ts::ctx(&mut scenario));
-            money_race::deposit(&room, &mut vault, &mut player_pos, &clock, coin);
+            money_race::deposit_for_testing(&mut room, &mut vault, &mut player_pos, &clock, coin);
 
             clock::destroy_for_testing(clock);
             ts::return_to_sender(&scenario, player_pos);
@@ -447,13 +447,37 @@ module money_race::money_race_tests {
             ts::return_shared(room);
         };
 
+        // Player joins (add at least one player so total_weight > 0)
+        ts::next_tx(&mut scenario, PLAYER1);
+        {
+            let mut room = ts::take_shared<Room>(&scenario);
+            let mut vault = ts::take_shared<Vault>(&scenario);
+            let mut clock = clock::create_for_testing(ts::ctx(&mut scenario));
+            clock::set_for_testing(&mut clock, START_TIME_MS);
+
+            let coin = mint_coin(DEPOSIT_AMOUNT, ts::ctx(&mut scenario));
+            let player_pos = money_race::join_room_for_testing(
+                &mut room,
+                &mut vault,
+                &clock,
+                coin,
+                ts::ctx(&mut scenario)
+            );
+
+            transfer::public_transfer(player_pos, PLAYER1);
+
+            clock::destroy_for_testing(clock);
+            ts::return_shared(room);
+            ts::return_shared(vault);
+        };
+
         // Finalize room
         ts::next_tx(&mut scenario, ADMIN);
         {
             let admin_cap = ts::take_from_sender<AdminCap>(&scenario);
             let mut room = ts::take_shared<Room>(&scenario);
 
-            money_race::finalize_room(&admin_cap, &mut room, 100);
+            money_race::finalize_room(&admin_cap, &mut room);
 
             ts::return_to_sender(&scenario, admin_cap);
             ts::return_shared(room);
@@ -484,7 +508,7 @@ module money_race::money_race_tests {
             let admin_cap = ts::take_from_sender<AdminCap>(&scenario);
             let mut room = ts::take_shared<Room>(&scenario);
 
-            money_race::finalize_room(&admin_cap, &mut room, 0);
+            money_race::finalize_room(&admin_cap, &mut room);
 
             ts::return_to_sender(&scenario, admin_cap);
             ts::return_shared(room);
@@ -539,13 +563,13 @@ module money_race::money_race_tests {
         // Player joins (1 deposit)
         ts::next_tx(&mut scenario, PLAYER1);
         {
-            let room = ts::take_shared<Room>(&scenario);
+            let mut room = ts::take_shared<Room>(&scenario);
             let mut vault = ts::take_shared<Vault>(&scenario);
             let mut clock = clock::create_for_testing(ts::ctx(&mut scenario));
             clock::set_for_testing(&mut clock, START_TIME_MS);
 
             let coin = mint_coin(DEPOSIT_AMOUNT, ts::ctx(&mut scenario));
-            let player_pos = money_race::join_room(&room, &mut vault, &clock, coin, ts::ctx(&mut scenario));
+            let player_pos = money_race::join_room_for_testing(&mut room, &mut vault, &clock, coin, ts::ctx(&mut scenario));
             transfer::public_transfer(player_pos, PLAYER1);
 
             clock::destroy_for_testing(clock);
@@ -556,14 +580,14 @@ module money_race::money_race_tests {
         // Player makes 2 more deposits (total 3 deposits)
         ts::next_tx(&mut scenario, PLAYER1);
         {
-            let room = ts::take_shared<Room>(&scenario);
+            let mut room = ts::take_shared<Room>(&scenario);
             let mut vault = ts::take_shared<Vault>(&scenario);
             let mut player_pos = ts::take_from_sender<PlayerPosition>(&scenario);
             let mut clock = clock::create_for_testing(ts::ctx(&mut scenario));
             clock::set_for_testing(&mut clock, START_TIME_MS + PERIOD_LENGTH_MS);
 
             let coin = mint_coin(DEPOSIT_AMOUNT, ts::ctx(&mut scenario));
-            money_race::deposit(&room, &mut vault, &mut player_pos, &clock, coin);
+            money_race::deposit_for_testing(&mut room, &mut vault, &mut player_pos, &clock, coin);
 
             clock::destroy_for_testing(clock);
             ts::return_to_sender(&scenario, player_pos);
@@ -573,14 +597,14 @@ module money_race::money_race_tests {
 
         ts::next_tx(&mut scenario, PLAYER1);
         {
-            let room = ts::take_shared<Room>(&scenario);
+            let mut room = ts::take_shared<Room>(&scenario);
             let mut vault = ts::take_shared<Vault>(&scenario);
             let mut player_pos = ts::take_from_sender<PlayerPosition>(&scenario);
             let mut clock = clock::create_for_testing(ts::ctx(&mut scenario));
             clock::set_for_testing(&mut clock, START_TIME_MS + PERIOD_LENGTH_MS * 2);
 
             let coin = mint_coin(DEPOSIT_AMOUNT, ts::ctx(&mut scenario));
-            money_race::deposit(&room, &mut vault, &mut player_pos, &clock, coin);
+            money_race::deposit_for_testing(&mut room, &mut vault, &mut player_pos, &clock, coin);
 
             clock::destroy_for_testing(clock);
             ts::return_to_sender(&scenario, player_pos);
@@ -604,7 +628,7 @@ module money_race::money_race_tests {
         {
             let admin_cap = ts::take_from_sender<AdminCap>(&scenario);
             let mut room = ts::take_shared<Room>(&scenario);
-            money_race::finalize_room(&admin_cap, &mut room, 3);
+            money_race::finalize_room(&admin_cap, &mut room);
             ts::return_to_sender(&scenario, admin_cap);
             ts::return_shared(room);
         };
@@ -612,7 +636,7 @@ module money_race::money_race_tests {
         // Claim all (should get 3 * DEPOSIT_AMOUNT principal + reward)
         ts::next_tx(&mut scenario, PLAYER1);
         {
-            let room = ts::take_shared<Room>(&scenario);
+            let mut room = ts::take_shared<Room>(&scenario);
             let mut vault = ts::take_shared<Vault>(&scenario);
             let mut player_pos = ts::take_from_sender<PlayerPosition>(&scenario);
 
@@ -645,13 +669,13 @@ module money_race::money_race_tests {
         // Player joins
         ts::next_tx(&mut scenario, PLAYER1);
         {
-            let room = ts::take_shared<Room>(&scenario);
+            let mut room = ts::take_shared<Room>(&scenario);
             let mut vault = ts::take_shared<Vault>(&scenario);
             let mut clock = clock::create_for_testing(ts::ctx(&mut scenario));
             clock::set_for_testing(&mut clock, START_TIME_MS);
 
             let coin = mint_coin(DEPOSIT_AMOUNT, ts::ctx(&mut scenario));
-            let player_pos = money_race::join_room(&room, &mut vault, &clock, coin, ts::ctx(&mut scenario));
+            let player_pos = money_race::join_room_for_testing(&mut room, &mut vault, &clock, coin, ts::ctx(&mut scenario));
             transfer::public_transfer(player_pos, PLAYER1);
 
             clock::destroy_for_testing(clock);
@@ -662,7 +686,7 @@ module money_race::money_race_tests {
         // Try to claim all without finalizing (should fail)
         ts::next_tx(&mut scenario, PLAYER1);
         {
-            let room = ts::take_shared<Room>(&scenario);
+            let mut room = ts::take_shared<Room>(&scenario);
             let mut vault = ts::take_shared<Vault>(&scenario);
             let mut player_pos = ts::take_from_sender<PlayerPosition>(&scenario);
 
@@ -695,13 +719,13 @@ module money_race::money_race_tests {
         // Player joins
         ts::next_tx(&mut scenario, PLAYER1);
         {
-            let room = ts::take_shared<Room>(&scenario);
+            let mut room = ts::take_shared<Room>(&scenario);
             let mut vault = ts::take_shared<Vault>(&scenario);
             let mut clock = clock::create_for_testing(ts::ctx(&mut scenario));
             clock::set_for_testing(&mut clock, START_TIME_MS);
 
             let coin = mint_coin(DEPOSIT_AMOUNT, ts::ctx(&mut scenario));
-            let player_pos = money_race::join_room(&room, &mut vault, &clock, coin, ts::ctx(&mut scenario));
+            let player_pos = money_race::join_room_for_testing(&mut room, &mut vault, &clock, coin, ts::ctx(&mut scenario));
             transfer::public_transfer(player_pos, PLAYER1);
 
             clock::destroy_for_testing(clock);
@@ -725,7 +749,7 @@ module money_race::money_race_tests {
         {
             let admin_cap = ts::take_from_sender<AdminCap>(&scenario);
             let mut room = ts::take_shared<Room>(&scenario);
-            money_race::finalize_room(&admin_cap, &mut room, 1);
+            money_race::finalize_room(&admin_cap, &mut room);
             ts::return_to_sender(&scenario, admin_cap);
             ts::return_shared(room);
         };
@@ -733,7 +757,7 @@ module money_race::money_race_tests {
         // Claim all first time
         ts::next_tx(&mut scenario, PLAYER1);
         {
-            let room = ts::take_shared<Room>(&scenario);
+            let mut room = ts::take_shared<Room>(&scenario);
             let mut vault = ts::take_shared<Vault>(&scenario);
             let mut player_pos = ts::take_from_sender<PlayerPosition>(&scenario);
             money_race::claim_all(&room, &mut vault, &mut player_pos, ts::ctx(&mut scenario));
@@ -745,7 +769,7 @@ module money_race::money_race_tests {
         // Try to claim again (should fail)
         ts::next_tx(&mut scenario, PLAYER1);
         {
-            let room = ts::take_shared<Room>(&scenario);
+            let mut room = ts::take_shared<Room>(&scenario);
             let mut vault = ts::take_shared<Vault>(&scenario);
             let mut player_pos = ts::take_from_sender<PlayerPosition>(&scenario);
             money_race::claim_all(&room, &mut vault, &mut player_pos, ts::ctx(&mut scenario));
@@ -779,13 +803,13 @@ module money_race::money_race_tests {
         // Player 1 joins
         ts::next_tx(&mut scenario, PLAYER1);
         {
-            let room = ts::take_shared<Room>(&scenario);
+            let mut room = ts::take_shared<Room>(&scenario);
             let mut vault = ts::take_shared<Vault>(&scenario);
             let mut clock = clock::create_for_testing(ts::ctx(&mut scenario));
             clock::set_for_testing(&mut clock, START_TIME_MS);
 
             let coin = mint_coin(DEPOSIT_AMOUNT, ts::ctx(&mut scenario));
-            let player_pos = money_race::join_room(&room, &mut vault, &clock, coin, ts::ctx(&mut scenario));
+            let player_pos = money_race::join_room_for_testing(&mut room, &mut vault, &clock, coin, ts::ctx(&mut scenario));
             transfer::public_transfer(player_pos, PLAYER1);
 
             clock::destroy_for_testing(clock);
@@ -796,13 +820,13 @@ module money_race::money_race_tests {
         // Player 2 joins
         ts::next_tx(&mut scenario, PLAYER2);
         {
-            let room = ts::take_shared<Room>(&scenario);
+            let mut room = ts::take_shared<Room>(&scenario);
             let mut vault = ts::take_shared<Vault>(&scenario);
             let mut clock = clock::create_for_testing(ts::ctx(&mut scenario));
             clock::set_for_testing(&mut clock, START_TIME_MS);
 
             let coin = mint_coin(DEPOSIT_AMOUNT, ts::ctx(&mut scenario));
-            let player_pos = money_race::join_room(&room, &mut vault, &clock, coin, ts::ctx(&mut scenario));
+            let player_pos = money_race::join_room_for_testing(&mut room, &mut vault, &clock, coin, ts::ctx(&mut scenario));
             transfer::public_transfer(player_pos, PLAYER2);
 
             clock::destroy_for_testing(clock);
@@ -813,14 +837,14 @@ module money_race::money_race_tests {
         // Player 1 deposits in period 1 and 2
         ts::next_tx(&mut scenario, PLAYER1);
         {
-            let room = ts::take_shared<Room>(&scenario);
+            let mut room = ts::take_shared<Room>(&scenario);
             let mut vault = ts::take_shared<Vault>(&scenario);
             let mut player_pos = ts::take_from_sender<PlayerPosition>(&scenario);
             let mut clock = clock::create_for_testing(ts::ctx(&mut scenario));
             clock::set_for_testing(&mut clock, START_TIME_MS + PERIOD_LENGTH_MS);
 
             let coin = mint_coin(DEPOSIT_AMOUNT, ts::ctx(&mut scenario));
-            money_race::deposit(&room, &mut vault, &mut player_pos, &clock, coin);
+            money_race::deposit_for_testing(&mut room, &mut vault, &mut player_pos, &clock, coin);
 
             clock::destroy_for_testing(clock);
             ts::return_to_sender(&scenario, player_pos);
@@ -830,14 +854,14 @@ module money_race::money_race_tests {
 
         ts::next_tx(&mut scenario, PLAYER1);
         {
-            let room = ts::take_shared<Room>(&scenario);
+            let mut room = ts::take_shared<Room>(&scenario);
             let mut vault = ts::take_shared<Vault>(&scenario);
             let mut player_pos = ts::take_from_sender<PlayerPosition>(&scenario);
             let mut clock = clock::create_for_testing(ts::ctx(&mut scenario));
             clock::set_for_testing(&mut clock, START_TIME_MS + PERIOD_LENGTH_MS * 2);
 
             let coin = mint_coin(DEPOSIT_AMOUNT, ts::ctx(&mut scenario));
-            money_race::deposit(&room, &mut vault, &mut player_pos, &clock, coin);
+            money_race::deposit_for_testing(&mut room, &mut vault, &mut player_pos, &clock, coin);
 
             clock::destroy_for_testing(clock);
             ts::return_to_sender(&scenario, player_pos);
@@ -861,7 +885,7 @@ module money_race::money_race_tests {
         {
             let admin_cap = ts::take_from_sender<AdminCap>(&scenario);
             let mut room = ts::take_shared<Room>(&scenario);
-            money_race::finalize_room(&admin_cap, &mut room, 4);
+            money_race::finalize_room(&admin_cap, &mut room);
             ts::return_to_sender(&scenario, admin_cap);
             ts::return_shared(room);
         };
@@ -869,7 +893,7 @@ module money_race::money_race_tests {
         // Player 1 claims all (principal: 3000 + reward: 7500 = 10,500)
         ts::next_tx(&mut scenario, PLAYER1);
         {
-            let room = ts::take_shared<Room>(&scenario);
+            let mut room = ts::take_shared<Room>(&scenario);
             let mut vault = ts::take_shared<Vault>(&scenario);
             let mut player_pos = ts::take_from_sender<PlayerPosition>(&scenario);
             money_race::claim_all(&room, &mut vault, &mut player_pos, ts::ctx(&mut scenario));
@@ -881,7 +905,7 @@ module money_race::money_race_tests {
         // Player 2 claims all (principal: 1000 + reward: 2500 = 3,500)
         ts::next_tx(&mut scenario, PLAYER2);
         {
-            let room = ts::take_shared<Room>(&scenario);
+            let mut room = ts::take_shared<Room>(&scenario);
             let mut vault = ts::take_shared<Vault>(&scenario);
             let mut player_pos = ts::take_from_sender<PlayerPosition>(&scenario);
             money_race::claim_all(&room, &mut vault, &mut player_pos, ts::ctx(&mut scenario));
