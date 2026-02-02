@@ -331,6 +331,49 @@ module money_race::money_race {
         transfer::public_transfer(player, sender);
     }
 
+    /// Join room on behalf of a user (for sponsored transactions)
+    /// Backend calls this function with its own coins to create PlayerPosition for the user
+    public entry fun join_room_for(
+        room: &mut Room,
+        vault: &mut Vault,
+        clock: &Clock,
+        coin: Coin<USDC>,
+        user: address,
+        ctx: &mut TxContext
+    ) {
+        assert!(room.status == STATUS_ACTIVE, E_INVALID_STATUS);
+
+        let period = current_period(room, clock);
+        assert!(period == 0, E_JOIN_CLOSED);
+
+        let amount = coin::value(&coin);
+        assert!(amount == room.deposit_amount, E_AMOUNT_INVALID);
+
+        let bal = coin::into_balance(coin);
+        balance::join(&mut vault.principal, bal);
+
+        // Auto-increment total_weight
+        room.total_weight = room.total_weight + 1;
+
+        let player = PlayerPosition {
+            id: sui::object::new(ctx),
+            owner: user, // Set owner to the specified user, not the sender
+            deposited_count: 1,
+            last_period: 0,
+            claimed: false
+        };
+
+        event::emit(PlayerJoined {
+            room_id: object::uid_to_inner(&room.id),
+            player: user,
+            player_position_id: object::uid_to_inner(&player.id),
+            amount
+        });
+
+        // Make PlayerPosition a shared object so backend can access it for deposits
+        transfer::public_share_object(player);
+    }
+
     /* =========================
         DEPOSIT
     ==========================*/

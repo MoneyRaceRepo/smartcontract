@@ -109,6 +109,39 @@ module mock_usdc::usdc {
         });
     }
 
+    /// Mint USDC to a specific recipient address
+    /// This is useful for sponsored transactions where the sponsor mints on behalf of a user
+    public entry fun mint_to(
+        faucet: &mut USDCFaucet,
+        recipient: address,
+        amount: u64,
+        clock: &Clock,
+        ctx: &mut TxContext
+    ) {
+        assert!(amount <= MAX_MINT_AMOUNT, E_AMOUNT_TOO_LARGE);
+
+        let now = clock::timestamp_ms(clock);
+
+        // Check cooldown for recipient address
+        if (table::contains(&faucet.last_mint, recipient)) {
+            let last = *table::borrow(&faucet.last_mint, recipient);
+            assert!(now >= last + COOLDOWN_MS, E_COOLDOWN_NOT_PASSED);
+            *table::borrow_mut(&mut faucet.last_mint, recipient) = now;
+        } else {
+            table::add(&mut faucet.last_mint, recipient, now);
+        };
+
+        let coin = coin::mint(&mut faucet.treasury, amount, ctx);
+        transfer::public_transfer(coin, recipient);
+
+        /* ===== EMIT EVENT ===== */
+        event::emit(MintEvent {
+            minter: recipient,
+            amount,
+            timestamp_ms: now,
+        });
+    }
+
     /* =========================
         VIEW HELPERS (INTERNAL)
     ==========================*/
