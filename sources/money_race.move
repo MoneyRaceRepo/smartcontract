@@ -7,6 +7,10 @@ module money_race::money_race {
     use sui::transfer;
     use sui::clock::Clock;
     use sui::event;
+    use sui::table::{Self, Table};
+    use sui::hash;
+    use std::option::{Self, Option};
+    use std::vector;
     use mock_usdc::usdc::USDC;
 
     /* =========================
@@ -25,6 +29,8 @@ module money_race::money_race {
     const E_ALREADY_CLAIMED: u64 = 6;
     const E_ZERO_WEIGHT: u64 = 7;
     const E_JOIN_CLOSED: u64 = 8;
+    const E_NOT_AUTHORIZED: u64 = 9;
+    const E_INVALID_PASSWORD: u64 = 10;
 
     /* =========================
         STRUCTS
@@ -42,7 +48,10 @@ module money_race::money_race {
         status: u8,
         start_time_ms: u64,
         period_length_ms: u64,
-        total_weight: u64
+        total_weight: u64,
+        is_private: bool,
+        password_hash: Option<vector<u8>>,
+        whitelist: Table<address, bool>
     }
 
     public struct Vault has key, store {
@@ -230,8 +239,16 @@ module money_race::money_race {
         strategy_id: u8,
         start_time_ms: u64,
         period_length_ms: u64,
+        is_private: bool,
+        password: vector<u8>, // Empty vector if public room
         ctx: &mut TxContext
     ) {
+        let password_hash = if (is_private && !std::vector::is_empty(&password)) {
+            option::some(hash::keccak256(&password))
+        } else {
+            option::none()
+        };
+
         let room = Room {
             id: sui::object::new(ctx),
             total_periods,
@@ -240,7 +257,10 @@ module money_race::money_race {
             status: STATUS_OPEN,
             start_time_ms,
             period_length_ms,
-            total_weight: 0
+            total_weight: 0,
+            is_private,
+            password_hash,
+            whitelist: table::new(ctx)
         };
 
         let vault = Vault {
@@ -261,6 +281,57 @@ module money_race::money_race {
 
         transfer::public_share_object(room);
         transfer::public_share_object(vault);
+    }
+
+    /* =========================
+        WHITELIST MANAGEMENT
+    ==========================*/
+
+    /// Add user to whitelist (admin only)
+    public entry fun add_to_whitelist(
+        _admin: &AdminCap,
+        room: &mut Room,
+        user: address
+    ) {
+        if (!table::contains(&room.whitelist, user)) {
+            table::add(&mut room.whitelist, user, true);
+        };
+    }
+
+    /// Remove user from whitelist (admin only)
+    public entry fun remove_from_whitelist(
+        _admin: &AdminCap,
+        room: &mut Room,
+        user: address
+    ) {
+        if (table::contains(&room.whitelist, user)) {
+            table::remove(&mut room.whitelist, user);
+        };
+    }
+
+    /// Check if user can join private room
+    fun can_join_private_room(
+        room: &Room,
+        user: address,
+        password: &vector<u8>
+    ): bool {
+        if (!room.is_private) {
+            return true
+        };
+
+        // Check whitelist first
+        if (table::contains(&room.whitelist, user)) {
+            return true
+        };
+
+        // Check password if provided
+        if (option::is_some(&room.password_hash) && !std::vector::is_empty(password)) {
+            let provided_hash = hash::keccak256(password);
+            let stored_hash = option::borrow(&room.password_hash);
+            return &provided_hash == stored_hash
+        };
+
+        false
     }
 
     /* =========================
@@ -295,9 +366,15 @@ module money_race::money_race {
         vault: &mut Vault,
         clock: &Clock,
         coin: Coin<USDC>,
+        password: vector<u8>, // Empty vector for public rooms
         ctx: &mut TxContext
     ) {
         assert!(room.status == STATUS_ACTIVE, E_INVALID_STATUS);
+
+        let sender = sui::tx_context::sender(ctx);
+
+        // Check authorization for private rooms
+        assert!(can_join_private_room(room, sender, &password), E_NOT_AUTHORIZED);
 
         let period = current_period(room, clock);
         assert!(period == 0, E_JOIN_CLOSED);
@@ -339,9 +416,13 @@ module money_race::money_race {
         clock: &Clock,
         coin: Coin<USDC>,
         user: address,
+        password: vector<u8>, // Empty vector for public rooms
         ctx: &mut TxContext
     ) {
         assert!(room.status == STATUS_ACTIVE, E_INVALID_STATUS);
+
+        // Check authorization for private rooms
+        assert!(can_join_private_room(room, user, &password), E_NOT_AUTHORIZED);
 
         let period = current_period(room, clock);
         assert!(period == 0, E_JOIN_CLOSED);
