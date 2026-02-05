@@ -46,12 +46,12 @@ module money_race::money_race_v2 {
     ====================================================== */
 
     /// Admin capability
-    public struct AdminCap has key {
+    public struct AdminCap has key, store {
         id: UID
     }
 
     /// Savings room
-    public struct Room has key {
+    public struct Room has key, store {
         id: UID,
         total_periods: u64,
         deposit_amount: u64,
@@ -63,14 +63,14 @@ module money_race::money_race_v2 {
     }
 
     /// Vault holding funds
-    public struct Vault has key {
+    public struct Vault has key, store {
         id: UID,
         principal: Balance<USDC>,
         reward: Balance<USDC>
     }
 
     /// Player position
-    public struct PlayerPosition has key {
+    public struct PlayerPosition has key, store {
         id: UID,
         owner: address,
         deposited_count: u64,
@@ -133,7 +133,6 @@ module money_race::money_race_v2 {
     /// - AMM fees
     /// - Protocol incentives
     ///
-    /// For hackathon purposes, yield is derived internally
     /// and added to reward pool.
     fun accrue_yield(room: &Room, vault: &mut Vault) {
         let rate_bps =
@@ -324,6 +323,7 @@ module money_race::money_race_v2 {
             coin::from_balance(principal_bal, ctx);
 
         player.claimed = true;
+        room.total_weight = room.total_weight - player.deposited_count;
 
         event::emit(RewardsClaimed {
             room_id: object::uid_to_inner(&room.id),
