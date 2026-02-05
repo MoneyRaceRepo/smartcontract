@@ -295,7 +295,7 @@ module money_race::money_race_v2 {
 
     /// Claim principal + reward
     public entry fun claim_all(
-        room: &Room,
+        room: &mut Room,
         vault: &mut Vault,
         player: &mut PlayerPosition,
         ctx: &mut TxContext
