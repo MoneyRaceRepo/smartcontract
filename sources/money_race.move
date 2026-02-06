@@ -91,7 +91,8 @@ module money_race::money_race_v2 {
     public struct DepositMade has copy, drop {
         room_id: ID,
         player: address,
-        period: u64
+        period: u64,
+        amount: u64
     }
 
     public struct YieldAccrued has copy, drop {
@@ -292,7 +293,8 @@ module money_race::money_race_v2 {
         event::emit(DepositMade {
             room_id: object::uid_to_inner(&room.id),
             player: player.owner,
-            period
+            period,
+            amount: room.deposit_amount
         });
     }
 
