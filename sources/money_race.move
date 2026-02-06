@@ -106,6 +106,14 @@ module money_race::money_race_v2 {
         reward: u64
     }
 
+    public struct PlayerJoined has copy, drop {
+        room_id: ID,
+        vault_id: ID,
+        player: address,
+        player_position_id: ID,
+        amount: u64
+    }
+
     /* ======================================================
         INIT
     ====================================================== */
@@ -245,6 +253,14 @@ module money_race::money_race_v2 {
             last_period: 0,
             claimed: false
         };
+
+        event::emit(PlayerJoined {
+            room_id: object::uid_to_inner(&room.id),
+            vault_id: object::uid_to_inner(&vault.id),
+            player: tx_context::sender(ctx),
+            player_position_id: object::uid_to_inner(&player.id),
+            amount: room.deposit_amount
+        });
 
         transfer::public_transfer(player, tx_context::sender(ctx));
     }
