@@ -312,6 +312,8 @@ module money_race::money_race_v2 {
     }
 
     /// Claim principal + reward
+    /// Principal is calculated proportionally from actual vault balance
+    /// because accrue_yield moves some principal into the reward pool.
     public entry fun claim_all(
         room: &mut Room,
         vault: &mut Vault,
@@ -321,6 +323,7 @@ module money_race::money_race_v2 {
         assert!(room.status == STATUS_FINISHED, E_INVALID_STATUS);
         assert!(!player.claimed, E_ALREADY_CLAIMED);
 
+        // Calculate proportional share of reward pool
         let reward_amount =
             (player.deposited_count * balance::value(&vault.reward))
             / room.total_weight;
@@ -331,8 +334,11 @@ module money_race::money_race_v2 {
         let reward_coin =
             coin::from_balance(reward_bal, ctx);
 
+        // Calculate proportional share of remaining principal
+        // (not fixed amount, because accrue_yield reduced principal)
         let principal_amount =
-            player.deposited_count * room.deposit_amount;
+            (player.deposited_count * balance::value(&vault.principal))
+            / room.total_weight;
 
         let principal_bal =
             balance::split(&mut vault.principal, principal_amount);
